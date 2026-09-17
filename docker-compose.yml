@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  moontv-redis:
+    image: redis:alpine
+    container_name: moontv-redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - /home/shenb/docker/moontv-redis:/data
+    networks:
+      - moontv-net
+
+  moontv:
+    image: ghcr.io/moontechlab/lunatv:latest
+    container_name: moontv
+    restart: always
+    ports:
+      - "3008:3000"
+    environment:
+      - NEXT_PUBLIC_STORAGE_TYPE=redis
+      - REDIS_URL=redis://moontv-redis:6379
+      - USERNAME=admin
+      - PASSWORD=admin123456
+      - NEXT_PUBLIC_SITE_NAME=MoonTV 局域网影院
+    depends_on:
+      - moontv-redis
+    networks:
+      - moontv-net
+
+networks:
+  moontv-net:
+    external: true
