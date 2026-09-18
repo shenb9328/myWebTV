@@ -686,11 +686,11 @@ function PlayPageClient() {
         }
         const data = await response.json();
 
-        // 处理搜索结果，根据规则过滤
+        // 处理搜索结果，根据规则过滤（忽略标点符号）
+        const cleanTitle = (t: string) => t.replace(/[^\w\u4e00-\u9fa5]/g, '').toLowerCase();
         const results = data.results.filter(
           (result: SearchResult) =>
-            result.title.replaceAll(' ', '').toLowerCase() ===
-            videoTitleRef.current.replaceAll(' ', '').toLowerCase() &&
+            cleanTitle(result.title) === cleanTitle(videoTitleRef.current) &&
             (videoYearRef.current
               ? result.year.toLowerCase() === videoYearRef.current.toLowerCase()
               : true) &&
@@ -1337,18 +1337,31 @@ function PlayPageClient() {
             const hls = new Hls({
               debug: false, // 关闭日志
               enableWorker: true, // WebWorker 解码，降低主线程压力
-              lowLatencyMode: false, // 点播无需低延迟，关闭后缓冲更充足，弱网下不易卡顿
+              lowLatencyMode: false, // 点播模式
 
-              /* 缓冲/内存相关 */
-              maxBufferLength: 60, // 前向缓冲最大 60s，出网带宽小的源可提前缓冲，减少卡顿
-              maxMaxBufferLength: 120, // 网络较差时允许缓冲区扩大到 120s
-              backBufferLength: 30, // 仅保留 30s 已播放内容，避免内存占用
-              maxBufferSize: 100 * 1000 * 1000, // 约 100MB，超出后触发清理
+              /* 缓冲/内存相关：初始秒开低延迟，起播后动态放大至 600s / 500MB */
+              maxBufferLength: 30, // 初始 30 秒保证秒开不拖沓
+              maxMaxBufferLength: 120, // 初始上限
+              backBufferLength: 30, // 仅保留 30s 已播放内容，节省内存给前向缓冲
+              maxBufferSize: 60 * 1000 * 1000, // 初始 60MB
 
               /* 自定义loader */
               loader: blockAdEnabledRef.current
                 ? CustomHlsJsLoader
                 : Hls.DefaultConfig.loader,
+            });
+
+            // 只要视频开始播放，立即激进放大前向缓冲区至 600 秒（10分钟）/ 500MB
+            video.addEventListener('playing', () => {
+              try {
+                if (video.hls && video.hls.config) {
+                  video.hls.config.maxBufferLength = 600; // 前向缓冲 600 秒（10分钟）
+                  video.hls.config.maxMaxBufferLength = 900; // 允许扩展至 900 秒
+                  video.hls.config.maxBufferSize = 500 * 1024 * 1024; // 缓冲区最大 500MB
+                }
+              } catch (e) {
+                console.warn('动态调整缓冲区失败:', e);
+              }
             });
 
             hls.loadSource(url);

@@ -16,7 +16,7 @@ services:
     container_name: moontv
     restart: always
     ports:
-      - "3008:3000"
+      - "3888:3000"
     environment:
       - NEXT_PUBLIC_STORAGE_TYPE=redis
       - REDIS_URL=redis://moontv-redis:6379
