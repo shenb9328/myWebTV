@@ -6,20 +6,25 @@ export function getAuthInfoFromCookie(request: NextRequest): {
   username?: string;
   signature?: string;
   timestamp?: number;
+  role?: 'owner' | 'admin' | 'user';
 } | null {
   const authCookie = request.cookies.get('auth');
 
-  if (!authCookie) {
-    return null;
+  if (authCookie) {
+    try {
+      const decoded = decodeURIComponent(authCookie.value);
+      const authData = JSON.parse(decoded);
+      if (authData && authData.username) return authData;
+    } catch (error) {
+      // 忽略解析错误
+    }
   }
 
-  try {
-    const decoded = decodeURIComponent(authCookie.value);
-    const authData = JSON.parse(decoded);
-    return authData;
-  } catch (error) {
-    return null;
-  }
+  // 免登录模式：默认使用 admin owner 身份
+  return {
+    username: process.env.USERNAME || 'admin',
+    role: 'owner',
+  };
 }
 
 // 从cookie获取认证信息 (客户端使用)
@@ -31,7 +36,10 @@ export function getAuthInfoFromBrowserCookie(): {
   role?: 'owner' | 'admin' | 'user';
 } | null {
   if (typeof window === 'undefined') {
-    return null;
+    return {
+      username: 'admin',
+      role: 'owner',
+    };
   }
 
   try {
@@ -52,21 +60,22 @@ export function getAuthInfoFromBrowserCookie(): {
     }, {} as Record<string, string>);
 
     const authCookie = cookies['auth'];
-    if (!authCookie) {
-      return null;
+    if (authCookie) {
+      // 处理可能的双重编码
+      let decoded = decodeURIComponent(authCookie);
+      if (decoded.includes('%')) {
+        decoded = decodeURIComponent(decoded);
+      }
+      const authData = JSON.parse(decoded);
+      if (authData && authData.username) return authData;
     }
-
-    // 处理可能的双重编码
-    let decoded = decodeURIComponent(authCookie);
-
-    // 如果解码后仍然包含 %，说明是双重编码，需要再次解码
-    if (decoded.includes('%')) {
-      decoded = decodeURIComponent(decoded);
-    }
-
-    const authData = JSON.parse(decoded);
-    return authData;
   } catch (error) {
-    return null;
+    // 忽略解析错误
   }
+
+  // 免登录模式：默认返回 admin / owner 身份
+  return {
+    username: 'admin',
+    role: 'owner',
+  };
 }

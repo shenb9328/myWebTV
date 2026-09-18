@@ -7,56 +7,33 @@ import { getAuthInfoFromCookie } from '@/lib/auth';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 跳过不需要认证的路径
-  if (shouldSkipAuth(pathname)) {
-    return NextResponse.next();
+  // 如果访问登录页，直接重定向回首页
+  if (pathname === '/login') {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
-  const storageType = process.env.NEXT_PUBLIC_STORAGE_TYPE || 'localstorage';
+  const response = NextResponse.next();
 
-  if (!process.env.PASSWORD) {
-    // 如果没有设置密码，重定向到警告页面
-    const warningUrl = new URL('/warning', request.url);
-    return NextResponse.redirect(warningUrl);
-  }
-
-  // 从cookie获取认证信息
-  const authInfo = getAuthInfoFromCookie(request);
-
-  if (!authInfo) {
-    return handleAuthFailure(request, pathname);
-  }
-
-  // localstorage模式：在middleware中完成验证
-  if (storageType === 'localstorage') {
-    if (!authInfo.password || authInfo.password !== process.env.PASSWORD) {
-      return handleAuthFailure(request, pathname);
-    }
-    return NextResponse.next();
-  }
-
-  // 其他模式：只验证签名
-  // 检查是否有用户名（非localStorage模式下密码不存储在cookie中）
-  if (!authInfo.username || !authInfo.signature) {
-    return handleAuthFailure(request, pathname);
-  }
-
-  // 验证签名（如果存在）
-  if (authInfo.signature) {
-    const isValidSignature = await verifySignature(
-      authInfo.username,
-      authInfo.signature,
-      process.env.PASSWORD || ''
+  // 若无 auth cookie，自动发放长期免登录凭证（默认超级管理员身份）
+  const authCookie = request.cookies.get('auth');
+  if (!authCookie) {
+    const defaultAuth = encodeURIComponent(
+      JSON.stringify({
+        username: process.env.USERNAME || 'admin',
+        role: 'owner',
+      })
     );
-
-    // 签名验证通过即可
-    if (isValidSignature) {
-      return NextResponse.next();
-    }
+    const expires = new Date();
+    expires.setFullYear(expires.getFullYear() + 10);
+    response.cookies.set('auth', defaultAuth, {
+      path: '/',
+      expires,
+      sameSite: 'lax',
+      httpOnly: false,
+    });
   }
 
-  // 签名验证失败或不存在签名
-  return handleAuthFailure(request, pathname);
+  return response;
 }
 
 // 验证签名
