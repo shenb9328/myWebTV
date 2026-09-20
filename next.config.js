@@ -14,6 +14,28 @@ const nextConfig = {
     instrumentationHook: process.env.NODE_ENV === 'production',
   },
 
+  async rewrites() {
+    const backendHost = process.env.TVBOX_BACKEND_URL || 'http://192.168.0.120:5888';
+    return [
+      {
+        source: '/cctv6/:path*',
+        destination: `${backendHost}/cctv6/:path*`,
+      },
+      {
+        source: '/cctv6',
+        destination: `${backendHost}/cctv6`,
+      },
+      {
+        source: '/api/cctv6/:path*',
+        destination: `${backendHost}/api/cctv6/:path*`,
+      },
+      {
+        source: '/live.m3u',
+        destination: `${backendHost}/live.m3u`,
+      },
+    ];
+  },
+
   // Uncoment to add domain whitelist
   images: {
     unoptimized: true,

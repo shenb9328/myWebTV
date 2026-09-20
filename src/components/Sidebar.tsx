@@ -127,6 +127,11 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
   const [menuItems, setMenuItems] = useState([
     {
       icon: Film,
+      label: 'CCTV6',
+      href: '/cctv6',
+    },
+    {
+      icon: Film,
       label: '电影',
       href: '/douban?type=movie',
     },
