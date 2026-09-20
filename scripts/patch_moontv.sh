@@ -45,6 +45,18 @@ if (fs.existsSync(file422)) {
   }
 }
 
+// 2.5 修改 9207.js 允许带有查询参数的 m3u8 地址通过校验
+const file9207 = "/app/.next/server/chunks/9207.js";
+if (fs.existsSync(file9207)) {
+  let code9207 = fs.readFileSync(file9207, "utf8");
+  if (code9207.includes("endsWith(\".m3u8\")")) {
+    code9207 = code9207.replaceAll("endsWith(\".m3u8\")", "includes(\".m3u8\")");
+    new vm.Script(code9207);
+    fs.writeFileSync(file9207, code9207);
+    console.log("Successfully patched 9207 chunk for m3u8 query parameters!");
+  }
+}
+
 // 3. 修改 server.js 注入反向代理钩子
 const serverFile = "/app/server.js";
 if (fs.existsSync(serverFile)) {
@@ -93,11 +105,13 @@ http.createServer = function(requestListener) {
 };
 const { startServer } = require(\x27next/dist/server/lib/start-server\x27);
 `;
-  if (serverCode.includes(targetStart)) {
+  if (!serverCode.includes("originalCreateServer") && serverCode.includes(targetStart)) {
     serverCode = serverCode.replace(targetStart, proxyCode);
     new vm.Script(serverCode);
     fs.writeFileSync(serverFile, serverCode);
     console.log("Successfully patched server.js with proxy hook!");
+  } else if (serverCode.includes("originalCreateServer")) {
+    console.log("server.js already contains proxy hook, skipping patch.");
   }
 }
 '
